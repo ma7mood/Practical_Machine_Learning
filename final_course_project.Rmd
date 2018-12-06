@@ -1,0 +1,191 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Saad Mahmood"
+date: "5 December 2018"
+output: html_document
+---
+
+### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+### Libraries Loading:
+
+```{r warning=FALSE, message=FALSE}
+library(caret)
+library(rattle) # for plotting decision trees
+```
+
+### Data loading:
+
+```{r}
+
+# We observe that some variables are "NA", "", and "#DIV/0!" We will load them all as "NA"
+
+TrainData <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"),header=TRUE, na.strings = c("NA","",'#DIV/0!'))
+dim(TrainData)
+TestData <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"),header=TRUE, na.strings = c("NA","",'#DIV/0!'))
+dim(TestData)
+
+```
+
+### Data cleaning:
+
+1. Remove NA variables
+
+Considering the fact that there are some variables with all `NA` values, we shall remove these columns.
+```{r}
+
+TrainDataClean <- TrainData[,(colSums(is.na(TrainData)) == 0)]
+dim(TrainDataClean)
+
+TestDataClean <- TestData[,(colSums(is.na(TestData)) == 0)]
+dim(TestDataClean)
+
+```
+
+2. Remove Near zero variance predictors
+
+These are predictors with very small variances, at times only containing number 0 as the only value. `caret` package has a utility function called `nearZeroVar` to locate these variables. These variables have very little predictive power.
+
+```{r}
+
+TrainDataClean <- TrainDataClean[,-nearZeroVar(TrainDataClean)]
+TestDataClean <- TestDataClean[,-nearZeroVar(TestDataClean)]
+
+```
+
+3. Removing the ID variable, it is simply row numbers
+
+```{r}
+TrainDataClean <- TrainDataClean[,-1]
+TestDataClean <- TestDataClean[,-1]
+```
+
+### Partition the training dataset:
+
+`createDataPartition` function from the caret package tries to maintain the ratio/'balance' of factor classes unlike the `sample` function which would produce a simple random sample.
+```{r}
+
+set.seed(1)
+inTrain <- createDataPartition(y = TrainDataClean$classe, 
+                                p=0.75, list=FALSE)
+Train1 <- TrainDataClean[inTrain,]
+Test1 <- TrainDataClean[-inTrain,]
+dim(Train1)
+dim(Test1)
+
+```
+
+
+
+### Testing 4 models:
+
+1. classification tree
+2. gradient boosting
+3. random forest
+4. Simple Max Voting Ensemble
+
+We use 5 fold Cross validation as it allows us to build a stronger predictor.
+
+```{r}
+set.seed(2)
+trControl <- trainControl(method="cv", number=5)
+```
+
+#### 1. Classification tree
+ 
+Classification tree is the first tool in our arsenal and a fancyRpartPlot helps us gauge the most important variables.
+```{r}
+set.seed(3)
+model_CT <- train(classe~., data=Train1, 
+                  method="rpart",
+                  trControl=trControl)
+fancyRpartPlot(model_CT$finalModel)
+
+trainpred1 <- predict(model_CT,newdata=Test1)
+
+confMatCT <- confusionMatrix(Test1$classe,trainpred1)
+
+# display confusion matrix and model accuracy
+confMatCT$table
+
+confMatCT$overall[1]
+```
+
+#### 2. Gradient boosting
+
+Gradient boosting builds trees one at a time, with each new tree correcting errors made by the previous tree.
+```{r}
+set.seed(5)
+model_GBM <- train(classe~., data=Train1, 
+                   method="gbm", 
+                   trControl=trControl, 
+                   verbose=FALSE)
+print(model_GBM)
+plot(model_GBM)
+
+trainpred2 <- predict(model_GBM,newdata=Test1)
+
+confMatGBM <- confusionMatrix(Test1$classe,trainpred2)
+confMatGBM$table
+
+confMatGBM$overall[1]
+
+
+```
+
+
+#### 3. Random forest
+
+Random forest is a really powerful tool as it combines the predictions from 100's of decision trees to come at the final prediction.
+
+```{r}
+set.seed(4)
+model_RF <- train(classe~., data=Train1, 
+                  method="rf", 
+                  trControl=trControl, 
+                  verbose=FALSE)
+print(model_RF)
+trainpred3 <- predict(model_RF,newdata=Test1)
+
+confMatRF <- confusionMatrix(Test1$classe,trainpred3)
+
+# display confusion matrix and model accuracy
+confMatRF$table
+
+confMatRF$overall[1]
+
+```
+
+#### 4. Max Voting Ensemble
+
+This Max Voting Ensemble combines the predictions from the previous three models and chooses the `classe` value that is the mode.
+
+```{r}
+
+df <- data.frame(trainpred1, trainpred2, trainpred3)
+getmode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+df$max <- as.factor(apply(df,1,getmode))
+
+confMatEnsemble <- confusionMatrix(Test1$classe, df$max)
+confMatEnsemble$table
+confMatEnsemble$overall[1]
+
+```
+
+
+### Final Prediction on the test set.
+
+We shall use the Random Forest model to make our final prediction as the other models are not as accurate.
+
+```{r}
+
+finalTestPred <- predict(model_RF, newdata=TestDataClean)
+finalTestPred
+```
