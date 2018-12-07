@@ -115,6 +115,10 @@ confMatCT$table
 confMatCT$overall[1]
 ```
 
+Accuracy is *0.633156*
+Out of sample error is *0.366844*
+Not a very accurate model.
+
 #### 2. Gradient boosting
 
 Gradient boosting builds trees one at a time, with each new tree correcting errors made by the previous tree.
@@ -136,6 +140,9 @@ confMatGBM$overall[1]
 
 
 ```
+Accuracy is *0.9957178*
+Out of sample error is *0.0043*
+Quite an accurate model.
 
 
 #### 3. Random forest
@@ -159,6 +166,9 @@ confMatRF$table
 confMatRF$overall[1]
 
 ```
+Accuracy is *0.9991843*
+Out of sample error is *0.0008*
+Extremely accurate model.
 
 #### 4. Max Voting Ensemble
 
@@ -178,7 +188,10 @@ confMatEnsemble$table
 confMatEnsemble$overall[1]
 
 ```
-
+Accuracy is *0.9961256*
+Out of sample error is *0.004*
+Again a very accurate model.
+  
 
 ### Final Prediction on the test set.
 
